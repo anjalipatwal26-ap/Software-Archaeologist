@@ -1,7 +1,11 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import settings
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 engine = create_engine(
@@ -9,8 +13,10 @@ engine = create_engine(
     pool_pre_ping=True,
 )
 
+
 SessionLocal = sessionmaker(
     bind=engine,
     autocommit=False,
     autoflush=False,
 )
+
