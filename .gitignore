@@ -7,10 +7,15 @@ __pycache__/
 *.py[cod]
 *.pyo
 
+
 # Virtual environments
 .venv/
 venv/
 env/
+# Local repository storage
+backend/storage/
+# Local analyzed repository data
+backend/data/
 
 # Node
 node_modules/

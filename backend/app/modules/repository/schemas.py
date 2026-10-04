@@ -23,6 +23,7 @@ class RepositoryAnalyzeResponse(BaseModel):
     repository_url: str
     status: str
     message: str
+    repository_path: str | None = None
 
     name: str | None = None
     owner: str | None = None

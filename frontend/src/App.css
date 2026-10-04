@@ -293,3 +293,185 @@ input {
     flex-direction: column;
   }
 }
+.graph-section {
+  margin-top: 115px;
+}
+
+.graph-section .section-heading {
+  margin-bottom: 25px;
+}
+
+.graph-section > div:last-child {
+  border: 1px solid #20293a;
+  border-radius: 14px;
+  background: #0c1018;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+}
+
+.graph-section .react-flow__controls {
+  border: 1px solid #293349;
+  box-shadow: none;
+}
+
+.graph-section .react-flow__controls-button {
+  background: #111827;
+  border-bottom: 1px solid #293349;
+  color: #aab4c7;
+}
+
+.graph-section .react-flow__minimap {
+  background: #111827;
+  border: 1px solid #293349;
+}
+.dependency-graph {
+  width: 100%;
+  height: 700px;
+  min-height: 700px;
+  margin-top: 24px;
+
+  border: 1px solid var(--border);
+  border-radius: 12px;
+
+  overflow: hidden;
+  background: var(--bg);
+
+  position: relative;
+}
+
+.dependency-graph-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 700px;
+
+  position: relative;
+}
+
+.dependency-graph-canvas .react-flow {
+  width: 100%;
+  height: 100%;
+  min-height: 700px;
+}
+.dependency-graph .react-flow__node {
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #34405a;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+}
+
+.dependency-graph .react-flow__node:hover {
+  border-color: #718cff;
+}
+
+.dependency-graph .react-flow__edge-path {
+  stroke: #718cff;
+  stroke-width: 1.5;
+}
+
+.dependency-graph .react-flow__minimap {
+  background: #111827;
+  border: 1px solid #34405a;
+}
+
+.dependency-graph .react-flow__minimap-mask {
+  fill: rgba(113, 140, 255, 0.15);
+}
+
+.timeline-section {
+  margin-top: 48px;
+}
+
+.timeline-count {
+  font-size: 13px;
+  color: var(--text);
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--code-bg);
+}
+
+.timeline {
+  position: relative;
+  margin-top: 30px;
+  padding-left: 34px;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--border);
+}
+
+.timeline-item {
+  position: relative;
+  display: flex;
+  margin-bottom: 24px;
+}
+
+.timeline-item:last-child {
+  margin-bottom: 0;
+}
+
+.timeline-dot {
+  position: absolute;
+  left: -34px;
+  top: 8px;
+  width: 15px;
+  height: 15px;
+  border: 3px solid var(--bg);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.timeline-content {
+  width: 100%;
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.timeline-content:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.timeline-content h4 {
+  margin: 0 0 12px;
+  color: var(--text-h);
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.timeline-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.commit-sha {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  color: var(--text);
+  font-family: monospace;
+  font-size: 12px;
+}

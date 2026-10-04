@@ -4,6 +4,7 @@ import httpx
 
 from app.core.database import SessionLocal
 from app.models.repository import Branch, Commit, Contributor, Repository
+from app.modules.repository.clone_service import clone_repository
 
 
 GITHUB_API_BASE_URL = "https://api.github.com"
@@ -66,29 +67,40 @@ def save_repository_data(
             repository.language = data.get("language")
             repository.stars = data.get("stargazers_count", 0)
             repository.forks = data.get("forks_count", 0)
-            repository.open_issues = data.get("open_issues_count", 0)
+            repository.open_issues = data.get(
+                "open_issues_count", 0
+            )
             repository.default_branch = data["default_branch"]
 
-            repository.github_created_at = parse_github_datetime(
-                data.get("created_at")
+            repository.github_created_at = (
+                parse_github_datetime(
+                    data.get("created_at")
+                )
             )
 
-            repository.github_updated_at = parse_github_datetime(
-                data.get("updated_at")
+            repository.github_updated_at = (
+                parse_github_datetime(
+                    data.get("updated_at")
+                )
             )
 
         # ---------------------------------------------------------
-        # Save only new commits
+        # Save commits
         # ---------------------------------------------------------
 
         existing_shas = {
             sha
-            for (sha,) in db.query(Commit.sha)
-            .filter(Commit.repository_id == repository.id)
-            .all()
+            for sha, in (
+                db.query(Commit.sha)
+                .filter(
+                    Commit.repository_id == repository.id
+                )
+                .all()
+            )
         }
 
         for commit_data in commits:
+
             if commit_data["sha"] in existing_shas:
                 continue
 
@@ -110,39 +122,64 @@ def save_repository_data(
 
         existing_contributors = {
             contributor.username: contributor
-            for contributor in db.query(Contributor)
-            .filter(
-                Contributor.repository_id == repository.id
+            for contributor in (
+                db.query(Contributor)
+                .filter(
+                    Contributor.repository_id
+                    == repository.id
+                )
+                .all()
             )
-            .all()
             if contributor.username
         }
 
         for contributor_data in contributors:
+
             username = contributor_data["username"]
 
             if not username:
                 continue
 
-            contributor = existing_contributors.get(username)
+            contributor = existing_contributors.get(
+                username
+            )
 
             if contributor is None:
+
                 contributor = Contributor(
                     repository_id=repository.id,
                     github_id=contributor_data["github_id"],
                     username=username,
-                    display_name=contributor_data["display_name"],
-                    contributions=contributor_data["contributions"],
-                    avatar_url=contributor_data["avatar_url"],
+                    display_name=contributor_data[
+                        "display_name"
+                    ],
+                    contributions=contributor_data[
+                        "contributions"
+                    ],
+                    avatar_url=contributor_data[
+                        "avatar_url"
+                    ],
                 )
 
                 db.add(contributor)
 
             else:
-                contributor.github_id = contributor_data["github_id"]
-                contributor.display_name = contributor_data["display_name"]
-                contributor.contributions = contributor_data["contributions"]
-                contributor.avatar_url = contributor_data["avatar_url"]
+
+                contributor.github_id = contributor_data[
+                    "github_id"
+                ]
+
+                contributor.display_name = contributor_data[
+                    "display_name"
+                ]
+
+                contributor.contributions = contributor_data[
+                    "contributions"
+                ]
+
+                contributor.avatar_url = contributor_data[
+                    "avatar_url"
+                ]
 
         # ---------------------------------------------------------
         # Save branches
@@ -150,22 +187,28 @@ def save_repository_data(
 
         existing_branches = {
             branch.name: branch
-            for branch in db.query(Branch)
-            .filter(
-                Branch.repository_id == repository.id
+            for branch in (
+                db.query(Branch)
+                .filter(
+                    Branch.repository_id == repository.id
+                )
+                .all()
             )
-            .all()
         }
 
         for branch_data in branches:
+
             branch_name = branch_data["name"]
 
             if not branch_name:
                 continue
 
-            branch = existing_branches.get(branch_name)
+            branch = existing_branches.get(
+                branch_name
+            )
 
             if branch is None:
+
                 branch = Branch(
                     repository_id=repository.id,
                     name=branch_name,
@@ -176,8 +219,11 @@ def save_repository_data(
                 db.add(branch)
 
             else:
+
                 branch.sha = branch_data["sha"]
-                branch.protected = branch_data["protected"]
+                branch.protected = branch_data[
+                    "protected"
+                ]
 
         db.commit()
 
@@ -190,47 +236,92 @@ def save_repository_data(
 
 
 def analyze_repository(repository_url: str) -> dict:
+
+    # ---------------------------------------------------------
+    # Validate GitHub URL
+    # ---------------------------------------------------------
+
     parts = [
         part
         for part in repository_url.rstrip("/").split("/")
         if part
     ]
 
-    if len(parts) < 2 or "github.com" not in repository_url:
+    if (
+        len(parts) < 2
+        or "github.com" not in repository_url
+    ):
         return {
             "repository_url": repository_url,
             "status": "invalid",
-            "message": "Please provide a valid GitHub repository URL.",
+            "message": (
+                "Please provide a valid GitHub repository URL."
+            ),
+            "repository_path": None,
             "commits": [],
+            "branches": [],
         }
 
     owner = parts[-2]
+
     repository = parts[-1].removesuffix(".git")
 
+    # ---------------------------------------------------------
+    # Clone repository locally
+    # ---------------------------------------------------------
+
+    clone_result = clone_repository(repository_url)
+
+    print("CLONE RESULT:", clone_result)
+
+    if clone_result["status"] == "error":
+
+        return {
+            "repository_url": repository_url,
+            "status": "error",
+            "message": clone_result["message"],
+            "repository_path": None,
+            "commits": [],
+            "branches": [],
+        }
+
+    repository_path = clone_result.get(
+        "repository_path"
+    )
+
+    # ---------------------------------------------------------
+    # GitHub API URLs
+    # ---------------------------------------------------------
+
     repository_api_url = (
-        f"{GITHUB_API_BASE_URL}/repos/{owner}/{repository}"
+        f"{GITHUB_API_BASE_URL}/repos/"
+        f"{owner}/{repository}"
     )
 
     commits_api_url = (
-        f"{GITHUB_API_BASE_URL}/repos/{owner}/{repository}/commits"
+        f"{GITHUB_API_BASE_URL}/repos/"
+        f"{owner}/{repository}/commits"
     )
 
     branches_api_url = (
-        f"{GITHUB_API_BASE_URL}/repos/{owner}/{repository}/branches"
+        f"{GITHUB_API_BASE_URL}/repos/"
+        f"{owner}/{repository}/branches"
     )
 
     contributors_api_url = (
-        f"{GITHUB_API_BASE_URL}/repos/{owner}/{repository}/contributors"
+        f"{GITHUB_API_BASE_URL}/repos/"
+        f"{owner}/{repository}/contributors"
     )
 
     headers = {
-        "Accept": "application/vnd.github+json",
+        "Accept": "application/vnd.github+json"
     }
 
+    # ---------------------------------------------------------
+    # Get repository information
+    # ---------------------------------------------------------
+
     try:
-        # ---------------------------------------------------------
-        # Fetch repository information
-        # ---------------------------------------------------------
 
         repository_response = httpx.get(
             repository_api_url,
@@ -239,20 +330,25 @@ def analyze_repository(repository_url: str) -> dict:
         )
 
         if repository_response.status_code == 404:
+
             return {
                 "repository_url": repository_url,
                 "status": "not_found",
-                "message": "GitHub repository was not found.",
+                "message": (
+                    "GitHub repository was not found."
+                ),
+                "repository_path": repository_path,
                 "commits": [],
+                "branches": [],
             }
 
         repository_response.raise_for_status()
 
         data = repository_response.json()
 
-        # ---------------------------------------------------------
-        # Fetch commits
-        # ---------------------------------------------------------
+        # -----------------------------------------------------
+        # Get commits
+        # -----------------------------------------------------
 
         commits_response = httpx.get(
             commits_api_url,
@@ -268,21 +364,34 @@ def analyze_repository(repository_url: str) -> dict:
         commits = []
 
         for commit in commits_data:
-            commit_details = commit.get("commit", {})
-            author_details = commit_details.get("author") or {}
+
+            commit_details = commit.get(
+                "commit", {}
+            )
+
+            author_details = (
+                commit_details.get("author")
+                or {}
+            )
 
             commits.append(
                 {
                     "sha": commit.get("sha"),
-                    "message": commit_details.get("message", ""),
-                    "author": author_details.get("name"),
-                    "date": author_details.get("date"),
+                    "message": commit_details.get(
+                        "message", ""
+                    ),
+                    "author": author_details.get(
+                        "name"
+                    ),
+                    "date": author_details.get(
+                        "date"
+                    ),
                 }
             )
 
-        # ---------------------------------------------------------
-        # Fetch branches
-        # ---------------------------------------------------------
+        # -----------------------------------------------------
+        # Get branches
+        # -----------------------------------------------------
 
         branches_response = httpx.get(
             branches_api_url,
@@ -298,17 +407,22 @@ def analyze_repository(repository_url: str) -> dict:
         branches = []
 
         for branch in branches_data:
+
             branches.append(
                 {
                     "name": branch.get("name"),
-                    "sha": branch.get("commit", {}).get("sha"),
-                    "protected": branch.get("protected", False),
+                    "sha": branch.get(
+                        "commit", {}
+                    ).get("sha"),
+                    "protected": branch.get(
+                        "protected", False
+                    ),
                 }
             )
 
-        # ---------------------------------------------------------
-        # Fetch contributors
-        # ---------------------------------------------------------
+        # -----------------------------------------------------
+        # Get contributors
+        # -----------------------------------------------------
 
         contributors_response = httpx.get(
             contributors_api_url,
@@ -319,27 +433,37 @@ def analyze_repository(repository_url: str) -> dict:
 
         contributors_response.raise_for_status()
 
-        contributors_data = contributors_response.json()
+        contributors_data = (
+            contributors_response.json()
+        )
 
         contributors = []
 
         for contributor in contributors_data:
+
             contributors.append(
                 {
-                    "github_id": contributor.get("id"),
-                    "username": contributor.get("login"),
-                    "display_name": contributor.get("name"),
-                    "contributions": contributor.get(
-                        "contributions",
-                        0,
+                    "github_id": contributor.get(
+                        "id"
                     ),
-                    "avatar_url": contributor.get("avatar_url"),
+                    "username": contributor.get(
+                        "login"
+                    ),
+                    "display_name": contributor.get(
+                        "name"
+                    ),
+                    "contributions": contributor.get(
+                        "contributions", 0
+                    ),
+                    "avatar_url": contributor.get(
+                        "avatar_url"
+                    ),
                 }
             )
 
-        # ---------------------------------------------------------
-        # Save everything to PostgreSQL
-        # ---------------------------------------------------------
+        # -----------------------------------------------------
+        # Save data to database
+        # -----------------------------------------------------
 
         save_repository_data(
             data,
@@ -348,52 +472,108 @@ def analyze_repository(repository_url: str) -> dict:
             branches,
         )
 
-        # ---------------------------------------------------------
-        # Return response
-        # ---------------------------------------------------------
+        # -----------------------------------------------------
+        # Final response
+        # -----------------------------------------------------
 
         return {
             "repository_url": repository_url,
             "status": "valid",
-            "message": f"Repository found: {data['full_name']}",
+            "message": (
+                f"Repository found: "
+                f"{data['full_name']}"
+            ),
+
+            # IMPORTANT
+            # This is the local cloned repository path.
+            "repository_path": repository_path,
+
             "name": data.get("name"),
-            "owner": data.get("owner", {}).get("login"),
-            "description": data.get("description"),
-            "language": data.get("language"),
-            "stars": data.get("stargazers_count"),
-            "forks": data.get("forks_count"),
-            "open_issues": data.get("open_issues_count"),
-            "default_branch": data.get("default_branch"),
-            "created_at": data.get("created_at"),
-            "updated_at": data.get("updated_at"),
+
+            "owner": data.get(
+                "owner", {}
+            ).get("login"),
+
+            "description": data.get(
+                "description"
+            ),
+
+            "language": data.get(
+                "language"
+            ),
+
+            "stars": data.get(
+                "stargazers_count"
+            ),
+
+            "forks": data.get(
+                "forks_count"
+            ),
+
+            "open_issues": data.get(
+                "open_issues_count"
+            ),
+
+            "default_branch": data.get(
+                "default_branch"
+            ),
+
+            "created_at": data.get(
+                "created_at"
+            ),
+
+            "updated_at": data.get(
+                "updated_at"
+            ),
+
             "commits": commits,
+
             "branches": branches,
         }
 
     except httpx.HTTPError:
+
         return {
             "repository_url": repository_url,
             "status": "error",
-            "message": "Could not connect to GitHub.",
+            "message": (
+                "Could not connect to GitHub."
+            ),
+            "repository_path": repository_path,
             "commits": [],
+            "branches": [],
         }
 
+
 def get_repositories() -> list[Repository]:
+
     db = SessionLocal()
 
     try:
-        return db.query(Repository).all()
+
+        return (
+            db.query(Repository)
+            .all()
+        )
 
     finally:
+
         db.close()
 
-def get_repository_by_id(repository_id: int) -> dict | None:
+
+def get_repository_by_id(
+    repository_id: int,
+) -> dict | None:
+
     db = SessionLocal()
 
     try:
+
         repository = (
             db.query(Repository)
-            .filter(Repository.id == repository_id)
+            .filter(
+                Repository.id == repository_id
+            )
             .first()
         )
 
@@ -402,20 +582,31 @@ def get_repository_by_id(repository_id: int) -> dict | None:
 
         commits = (
             db.query(Commit)
-            .filter(Commit.repository_id == repository.id)
-            .order_by(Commit.authored_at.desc())
+            .filter(
+                Commit.repository_id
+                == repository.id
+            )
+            .order_by(
+                Commit.authored_at.desc()
+            )
             .all()
         )
 
         branches = (
             db.query(Branch)
-            .filter(Branch.repository_id == repository.id)
+            .filter(
+                Branch.repository_id
+                == repository.id
+            )
             .all()
         )
 
         contributors = (
             db.query(Contributor)
-            .filter(Contributor.repository_id == repository.id)
+            .filter(
+                Contributor.repository_id
+                == repository.id
+            )
             .all()
         )
 
@@ -432,6 +623,7 @@ def get_repository_by_id(repository_id: int) -> dict | None:
             "open_issues": repository.open_issues,
             "default_branch": repository.default_branch,
             "ingested_at": repository.ingested_at,
+
             "commits": [
                 {
                     "sha": commit.sha,
@@ -441,6 +633,7 @@ def get_repository_by_id(repository_id: int) -> dict | None:
                 }
                 for commit in commits
             ],
+
             "branches": [
                 {
                     "name": branch.name,
@@ -449,6 +642,7 @@ def get_repository_by_id(repository_id: int) -> dict | None:
                 }
                 for branch in branches
             ],
+
             "contributors": [
                 {
                     "github_id": contributor.github_id,
@@ -462,4 +656,5 @@ def get_repository_by_id(repository_id: int) -> dict | None:
         }
 
     finally:
+
         db.close()
